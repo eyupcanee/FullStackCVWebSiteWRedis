@@ -24,6 +24,11 @@ const AdminTestSchema = new mongoose.Schema(
       required: true,
     },
     phoneNumber: String,
+    role: {
+      type: String,
+      enum: ["admin"],
+      default: "admin",
+    },
   },
   { timestamps: true }
 );
