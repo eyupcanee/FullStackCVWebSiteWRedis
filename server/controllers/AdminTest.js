@@ -116,7 +116,8 @@ export const getAdmin = async (req, res) => {
 };
 
 export const deleteAdmin = async (req, res) => {
-  const { id, token } = req.body;
+  const { id } = req.params;
+  const { token } = req.body;
   const ProcessorId = GetId(token);
 
   try {
