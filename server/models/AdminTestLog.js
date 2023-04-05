@@ -23,5 +23,5 @@ const AdminTestLogSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const AdminTestLog = mongoose.Model("AdminTestLog", AdminTestLogSchema);
+const AdminTestLog = mongoose.model("AdminTestLog", AdminTestLogSchema);
 export default AdminTestLog;

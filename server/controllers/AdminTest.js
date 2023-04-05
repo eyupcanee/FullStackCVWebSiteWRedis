@@ -29,34 +29,35 @@ export const loginAdmin = async (req, res) => {
     });
     if (!admin) {
       res.status(200).json({ status: "no", message: "No such record found!" });
-    }
-    if (await bcrypt.compare(password, admin.password)) {
-      const token = jwt.sign(
-        {
-          id: admin._id,
-          role: admin.role,
-        },
-        process.env.JWT_CODE
-      );
-      const logMessage = `${admin.name} ${admin.surname} Has Logged In As A Admin | Admin Id : ${admin._id}`;
-      await insertAdminLog({
-        id: admin._id,
-        logMessage: logMessage,
-        logType: "login",
-        success: true,
-      });
-      npmlog.info(logMessage);
-      res.status(200).json({ status: "ok", token: token });
     } else {
-      const logMessage = `${admin.name} ${admin.surname} Has Tried Login In As A Admin With Wrong Password | Admin Id : ${admin._id}`;
-      await insertAdminLog({
-        id: admin._id,
-        logMessage: logMessage,
-        logType: "login",
-        success: false,
-      });
-      npmlog.warn(logMessage);
-      res.status(200).json({ status: "no" });
+      if (await bcrypt.compare(password, admin.password)) {
+        const token = jwt.sign(
+          {
+            id: admin._id,
+            role: admin.role,
+          },
+          process.env.JWT_CODE
+        );
+        const logMessage = `${admin.name} ${admin.surname} Has Logged In As A Admin | Admin Id : ${admin._id}`;
+        await insertAdminLog({
+          id: admin._id,
+          logMessage: logMessage,
+          logType: "login",
+          success: true,
+        });
+        npmlog.info(logMessage);
+        res.status(200).json({ status: "ok", token: token });
+      } else {
+        const logMessage = `${admin.name} ${admin.surname} Has Tried Login In As A Admin With Wrong Password | Admin Id : ${admin._id}`;
+        await insertAdminLog({
+          id: admin._id,
+          logMessage: logMessage,
+          logType: "login",
+          success: false,
+        });
+        npmlog.warn(logMessage);
+        res.status(200).json({ status: "no" });
+      }
     }
   } catch (error) {
     res.status(404).json({ status: "no" });
@@ -64,7 +65,7 @@ export const loginAdmin = async (req, res) => {
 };
 
 export const logOutAdmin = async (req, res) => {
-  const { token } = req.body.token;
+  const { token } = req.body;
   const ProcessorId = await GetId(token);
   try {
     if (await AdminAuthorize(token)) {
@@ -78,9 +79,11 @@ export const logOutAdmin = async (req, res) => {
       npmlog.info(logMessage);
       res.status(200).json({ status: "ok" });
     } else {
-      const logMessage = `${ProcessorId} Has Tried To Log Out`;
+      const logMessage = `${
+        ProcessorId ? ProcessorId : defProcessorId
+      } Has Tried To Log Out`;
       await insertAdminLog({
-        id: ProcessorId,
+        id: `${ProcessorId ? ProcessorId : defProcessorId}`,
         logMessage: logMessage,
         logType: "logout",
         success: false,
@@ -116,34 +119,44 @@ export const getAdmin = async (req, res) => {
 };
 
 export const deleteAdmin = async (req, res) => {
-  const { id } = req.params;
-  const { token } = req.body;
-  const ProcessorId = GetId(token);
-
+  const { id, token } = req.params;
+  const ProcessorId = await GetId(token);
   try {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      res.status(404).json({ status: "no", message: "Wrong Id Type!" });
-    } else {
-      const admin = await AdminTest.find({
-        id: id,
-      });
-
-      if (!admin) {
-        res
-          .status(404)
-          .json({ status: "no", message: "There Isn't Admin With This Id!" });
+    if (await AdminAuthorize(token)) {
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        res.status(404).json({ status: "no", message: "Wrong Id Type!" });
       } else {
-        await AdminTest.findByIdAndRemove(id);
-        const logMessage = `${admin.name} ${admin.surname} Has Deleted | Admin Id : ${id} | Made By : ${ProcessorId}`;
-        await insertAdminLog({
-          id: ProcessorId,
-          logMessage: logMessage,
-          logType: "delete",
-          success: true,
-        });
-        npmlog.info(logMessage);
-        res.status(200).json({ status: "ok" });
+        const admin = await AdminTest.findById(id);
+
+        if (!admin) {
+          res
+            .status(404)
+            .json({ status: "no", message: "There isn't record like this id" });
+        } else {
+          await AdminTest.findOneAndRemove(id);
+          const logMessage = `${id} Has Deleted | Made By : ${ProcessorId}`;
+          await insertAdminLog({
+            id: ProcessorId,
+            logMessage: logMessage,
+            logType: "delete",
+            success: true,
+          });
+          npmlog.info(logMessage);
+          res.status(200).json({ status: "ok" });
+        }
       }
+    } else {
+      const logMessage = `Unauthorized Deletion | ${id} Has Tried To Delete | Made By : ${
+        ProcessorId ? ProcessorId : defProcessorId
+      }`;
+      await insertAdminLog({
+        id: `${ProcessorId ? ProcessorId : defProcessorId}`,
+        logMessage: logMessage,
+        logType: "delete",
+        success: false,
+      });
+      npmlog.info(logMessage);
+      res.status(404).json({ status: "no" });
     }
   } catch (error) {
     res.status(404).json({ status: "no", message: error.message });
@@ -168,8 +181,8 @@ export const addAdmin = async (req, res) => {
       await newAdmin.save();
       const logMessage = `New Admin Has Added | New Admin : ${newAdmin.name} ${newAdmin.surname} | Made By : ${ProcessorId}`;
       npmlog.info(logMessage);
-      await insertAdminLog({
-        id: adminId,
+      insertAdminLog({
+        id: ProcessorId,
         logMessage: logMessage,
         logType: "insert",
         success: true,
@@ -181,38 +194,38 @@ export const addAdmin = async (req, res) => {
       } ${newAdmin.surname} | Tried By : ${
         ProcessorId ? ProcessorId : defProcessorId
       }`;
+      npmlog.warn(logMessage);
+      insertAdminLog({
+        id: `${ProcessorId ? ProcessorId : defProcessorId}`,
+        logMessage: logMessage,
+        logType: "insert",
+        success: false,
+      });
+      res.status(404).json({
+        status: "no",
+        message: "You don't have permission for this process!",
+      });
     }
-    npmlog.warn(logMessage);
-    await insertAdminLog({
-      id: `${ProcessorId ? ProcessorId : defProcessorId}`,
-      logMessage: logMessage,
-      logType: "insert",
-      success: false,
-    });
-    res.status(404).json({
-      status: "no",
-      message: "You don't have permission for this process!",
-    });
   } catch (error) {
     const logMessage = `New Admin Insertion Has Tried | New Admin : ${
       newAdmin.name
     } | Tried By : ${ProcessorId ? ProcessorId : defProcessorId} | Error : ${
       error.message
     }`;
+    await insertAdminLog({
+      id: `${ProcessorId ? ProcessorId : defProcessorId}`,
+      logMessage: logMessage,
+      logType: "insert",
+      success: false,
+    });
+    npmlog.warn(logMessage);
   }
-  await insertAdminLog({
-    id: `${ProcessorId ? ProcessorId : defProcessorId}`,
-    logMessage: logMessage,
-    logType: "insert",
-    success: false,
-  });
-  npmlog.warn(logMessage);
 };
 
 export const updateAdmin = async (req, res) => {
-  const { id, name, surname, password, phoneNumber, token } = req.body;
+  const { id, name, surname, email, password, phoneNumber, token } = req.body;
   const encryptedPassword = await bcrypt.hash(password, 8);
-  const ProcessorId = GetId(token);
+  const ProcessorId = await GetId(token);
   try {
     if (await AdminAuthorize(token)) {
       await AdminTest.findByIdAndUpdate(id, {
@@ -224,7 +237,7 @@ export const updateAdmin = async (req, res) => {
       });
 
       const logMessage = `${name} ${surname}'s Datas Have Updated | Data Owner : ${id} | Made By : ${ProcessorId}`;
-      await insertAdminLog({
+      insertAdminLog({
         id: ProcessorId,
         logMessage: logMessage,
         logType: "update",

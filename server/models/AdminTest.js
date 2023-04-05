@@ -33,5 +33,5 @@ const AdminTestSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const AdminTest = mongoose.Model("AdminTest", AdminTestSchema);
+const AdminTest = mongoose.model("AdminTest", AdminTestSchema);
 export default AdminTest;

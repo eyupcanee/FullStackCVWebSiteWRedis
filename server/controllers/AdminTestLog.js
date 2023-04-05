@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
-import AdminLog from "../models/AdminLog.js";
+import AdminTestLog from "../models/AdminTestLog.js";
 
 export const insertAdminLog = async (log) => {
-  const newLog = new AdminLog({
+  const newLog = new AdminTestLog({
     admin: log.id,
     logMessage: log.logMessage,
     logType: log.logType,
@@ -10,7 +10,7 @@ export const insertAdminLog = async (log) => {
   });
 
   try {
-    await newLog.save();
+    newLog.save();
   } catch (error) {
     console.log(error.message);
   }
